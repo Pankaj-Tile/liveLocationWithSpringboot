@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Real-Time Vehicle Tracking</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+</head>
+<body>
+    <div id="map" style="height: 600px;"></div>
+    <button id="toggleLocation">Start Sharing Location</button>
+    <script>
+        var map = L.map('map').setView([51.505, -0.09], 13);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+        }).addTo(map);
+
+        var userMarker;
+        var userId = 'user-' + Math.random().toString(36).substr(2, 9);
+        var markers = {};
+        var watchId;
+        var isSharingLocation = false;
+        var toggleButton = document.getElementById('toggleLocation');
+        var socket = new WebSocket("ws://localhost:8080/ws");
+
+        socket.onopen = function() {
+            console.log("WebSocket connection opened");
+        };
+
+        socket.onmessage = function(event) {
+            console.log("Received data from WebSocket:", event.data);
+            var data;
+            try {
+                data = JSON.parse(event.data);
+            } catch (e) {
+                console.error("Error parsing JSON:", e);
+                return;
+            }
+
+            if (Array.isArray(data)) {
+                updateMarkers(data);
+            } else {
+                console.error("Expected an array but received:", data);
+            }
+        };
+
+        socket.onclose = function(event) {
+            console.log("WebSocket connection closed: ", event);
+        };
+
+        function startSharingLocation() {
+            if ("geolocation" in navigator) {
+                watchId = navigator.geolocation.watchPosition(function(position) {
+                    var lat = position.coords.latitude;
+                    var lon = position.coords.longitude;
+                    var speed = position.coords.speed || 0;
+
+                    if (!userMarker) {
+                        userMarker = L.circleMarker([lat, lon], {color: 'blue'}).addTo(map);
+                        map.setView([lat, lon], 13);
+                    } else {
+                        userMarker.setLatLng([lat, lon]);
+                    }
+
+                    var locationData = {
+                        userId: userId,
+                        latitude: lat,
+                        longitude: lon,
+                        speed: speed,
+                        timestamp: new Date().toISOString()
+                    };
+
+                    if (socket.readyState === WebSocket.OPEN) {
+                        socket.send(JSON.stringify(locationData));
+                    }
+
+                }, function(error) {
+                    console.error("Error getting location: ", error.message);
+                    alert("Error getting location: " + error.message);
+                }, {
+                    enableHighAccuracy: true,
+                    timeout: 10000,
+                    maximumAge: 0
+                });
+
+                isSharingLocation = true;
+                toggleButton.textContent = 'Stop Sharing Location';
+            } else {
+                alert("Geolocation is not available in this browser.");
+            }
+        }
+
+        function stopSharingLocation() {
+            if (watchId) {
+                navigator.geolocation.clearWatch(watchId);
+                watchId = null;
+            }
+            if (socket.readyState === WebSocket.OPEN) {
+                socket.send(JSON.stringify({ action: 'removeLocation', userId: userId }));
+            }
+            isSharingLocation = false;
+            toggleButton.textContent = 'Start Sharing Location';
+        }
+
+        toggleButton.addEventListener('click', function() {
+            if (isSharingLocation) {
+                stopSharingLocation();
+            } else {
+                startSharingLocation();
+            }
+        });
+
+        function updateMarkers(data) {
+            data.forEach(function(location) {
+                var lat = location.latitude;
+                var lon = location.longitude;
+                var userId = location.userId;
+                var color = location.speed < 100 ? 'green' : 'red';
+
+                if (markers[userId]) {
+                    markers[userId].setLatLng([lat, lon]);
+                    markers[userId].setStyle({color: color});
+                } else {
+                    markers[userId] = L.circleMarker([lat, lon], {color: color}).addTo(map);
+                }
+            });
+        }
+
+        // Fetch other users' locations every second
+        setInterval(function() {
+            if (socket.readyState === WebSocket.OPEN) {
+                socket.send(JSON.stringify({ action: 'fetchLocations' }));
+            }
+        }, 1000);
+    </script>
+</body>
+</html>

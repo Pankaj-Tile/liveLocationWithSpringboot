@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Location Map</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.6.0/dist/leaflet.css">
+</head>
+<body>
+    <button onclick="getLocation()">Share My Location</button>
+    <div id="osm-map" style="height: 400px;"></div>
+
+    <script src="https://unpkg.com/leaflet@1.6.0/dist/leaflet.js"></script>
+    <script>
+        function getLocation() {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(showMap);
+            } else {
+                alert("Geolocation is not supported by this browser.");
+            }
+        }
+
+        function showMap(position) {
+            const { latitude, longitude } = position.coords;
+
+            // Create Leaflet map centered at the user's location
+            const map = L.map("osm-map").setView([latitude, longitude], 14);
+
+            // Add OSM tile layer to the map
+            L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+                attribution: '© <a href="http://osm.org/copyright">OpenStreetMap</a> contributors'
+            }).addTo(map);
+
+            // Place a marker at the user's location
+            L.marker([latitude, longitude]).addTo(map);
+        }
+    </script>
+</body>
+</html>
