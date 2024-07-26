@@ -115,7 +115,7 @@
                 var lat = location.latitude;
                 var lon = location.longitude;
                 var userId = location.userId;
-                var color = location.speed < 100 ? 'green' : 'red';
+                var color = location.speed < 80 ? 'green' : 'red';
 
                 if (markers[userId]) {
                     markers[userId].setLatLng([lat, lon]);
