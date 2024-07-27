@@ -21,7 +21,7 @@
         var watchId;
         var isSharingLocation = false;
         var toggleButton = document.getElementById('toggleLocation');
-        var socket = new WebSocket("ws://localhost:8080/ws");
+        var socket = new WebSocket("wss://192.168.101.7:8080/ws");
 
         socket.onopen = function() {
             console.log("WebSocket connection opened");
@@ -32,6 +32,7 @@
             var data;
             try {
                 data = JSON.parse(event.data);
+                console.log("Parsed data:", data);
             } catch (e) {
                 console.error("Error parsing JSON:", e);
                 return;
@@ -42,6 +43,10 @@
             } else {
                 console.error("Expected an array but received:", data);
             }
+        };
+
+        socket.onerror = function(error) {
+            console.error("WebSocket error:", error);
         };
 
         socket.onclose = function(event) {
@@ -71,6 +76,7 @@
                     };
 
                     if (socket.readyState === WebSocket.OPEN) {
+                        console.log("Sending location data:", locationData);
                         socket.send(JSON.stringify(locationData));
                     }
 
@@ -129,6 +135,7 @@
         // Fetch other users' locations every second
         setInterval(function() {
             if (socket.readyState === WebSocket.OPEN) {
+                console.log("Fetching locations from server");
                 socket.send(JSON.stringify({ action: 'fetchLocations' }));
             }
         }, 1000);
